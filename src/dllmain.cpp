@@ -3,7 +3,6 @@
 
 #include "SDK/Engine_classes.hpp"
 #include "SDK/EndGame_classes.hpp"
-#include "SDK/Loca_Loading_classes.hpp"
 #include "SDK/Pause_00_classes.hpp"
 #include "SDK/BattleTips_classes.hpp"
 #include "SDK/Com_Window_01_classes.hpp"
@@ -472,37 +471,29 @@ void HUD()
             spdlog::error("HUD: Movie: Pattern scan failed.");
         }
 
-        /*
         // Fades
-        std::uint8_t* HUDFadesScanResult = Memory::PatternScan(exeModule, "48 8D ?? ?? ?? ?? ?? F2 0F ?? ?? ?? 0F ?? ?? C6 ?? ?? 01 4C ?? ?? ?? ?? ?? ?? 0F ?? ?? ??");
+        std::uint8_t* HUDFadesScanResult = Memory::PatternScan(exeModule, "41 ?? FF FF FF FF F2 0F ?? ?? ?? 48 ?? ?? ?? ?? ?? ?? 85 ?? 7E ?? 48 8B ??");
         if (HUDFadesScanResult) {
             spdlog::info("HUD: Fades: Address is {:s}+{:x}", sExeName.c_str(), HUDFadesScanResult - (std::uint8_t*)exeModule);
-            static SafetyHookMid HUDFadesSizeMidHook{};
-            HUDFadesSizeMidHook = safetyhook::create_mid(HUDFadesScanResult,
+            static SafetyHookMid HUDFadesMidHook{};
+            HUDFadesMidHook = safetyhook::create_mid(HUDFadesScanResult,
                 [](SafetyHookContext& ctx) {
-                    if (!bMovieIsPlaying) {
-                        if (fAspectRatio > fNativeAspect)
-                            ctx.xmm0.f32[0] = (ctx.xmm0.f32[1] * fAspectRatio);
-                        else if (fAspectRatio < fNativeAspect)
-                            ctx.xmm0.f32[1] = (ctx.xmm0.f32[0] / fAspectRatio);
-                    }
-                });
-
-            static SafetyHookMid HUDFadesOffsetMidHook{};
-            HUDFadesOffsetMidHook = safetyhook::create_mid(HUDFadesScanResult,
-                [](SafetyHookContext& ctx) {
-                    if (!bMovieIsPlaying) {
-                        if (fAspectRatio > fNativeAspect)
-                            ctx.xmm0.f32[0] = 0.00f;
-                        else if (fAspectRatio < fNativeAspect)
-                            ctx.xmm0.f32[1] = 0.00f;
+                    // This is some hacky shite, find a better way to fix this >:(
+                    if (ctx.rcx && ctx.xmm0.f32[0] >= 1919.00f && ctx.xmm0.f32[0] <= 1921.00f) {
+                        if (fAspectRatio > fNativeAspect) {
+                            *reinterpret_cast<float*>(ctx.rcx + 0x10) = 0.00f;
+                            ctx.xmm0.f32[0] = ctx.xmm0.f32[1] * fAspectRatio;
+                        }
+                        else if (fAspectRatio < fNativeAspect) {
+                            *reinterpret_cast<float*>(ctx.rcx + 0x14) = 0.00f;
+                            ctx.xmm0.f32[1] = ctx.xmm0.f32[0] / fAspectRatio;
+                        }
                     }
                 });
         }
         else {
             spdlog::error("HUD: Fades: Pattern scan failed.");
         }
-        */
 
         // HUD Widgets
         std::uint8_t* HUDWidgetsScanResult = Memory::PatternScan(exeModule, "48 8D ?? ?? ?? ?? ?? 89 ?? ?? 48 89 ?? ?? ?? 41 ?? 03 00 00 00 0F 28 ?? ?? ??");
@@ -513,7 +504,6 @@ void HUD()
             static std::string objName;
             static std::string objOldName;
 
-            static SDK::ULoca_Loading_C* UMGLoading = nullptr;
             static SDK::UEndUserWidget* UMGColiseum = nullptr;
             static SDK::UPause_00_C* UMGPause = nullptr;
             static SDK::UBattleTips_C* UMGBattleTips = nullptr;
@@ -623,19 +613,6 @@ void HUD()
                                 else if (fAspectRatio < fNativeAspect)
                                     UMGBattleTips->Img_BlackFilter->SetRenderScale(SDK::FVector2D(1.00f, 1.00f / fAspectMultiplier));
                             }
-                        }
-
-                        // "Loca_Loading_C", loading screens
-                        if (objName.contains("Loca_Loading_C") && UMGLoading != obj) {
-                            #ifdef _DEBUG
-                            spdlog::info("HUD: Widgets: Loading: {}", objName);
-                            spdlog::info("HUD: Widgets: Loading: Address: {:x}", (uintptr_t)obj);
-                            #endif
-
-                            UMGLoading = (SDK::ULoca_Loading_C*)obj;
-
-                            auto rw = (SDK::UEndCanvasPanel*)UMGLoading->WidgetTree->RootWidget;
-                            auto slot = (SDK::UEndCanvasPanelSlot*)rw->Slots[2];
                         }
 
                         // "Coliseum_Top_C", battle arena
