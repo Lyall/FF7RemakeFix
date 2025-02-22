@@ -1,0 +1,73 @@
+name: create-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version number'
+        required: true
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'true'
+
+    - name: setup-msbuild
+      uses: microsoft/setup-msbuild@v2
+      
+    - run: msbuild ${{ github.event.repository.name }}.sln -t:rebuild -verbosity:diag -property:Configuration=Release -property:Platform=x64
+    - run: cp x64\Release\${{ github.event.repository.name }}.asi ${{ github.event.repository.name }}.asi
+
+    - uses: robinraju/release-downloader@v1.11
+      with:
+        repository: "ThirteenAG/Ultimate-ASI-Loader"
+        latest: true
+        fileName: "Ultimate-ASI-Loader_x64.zip"
+
+    - name: Prepare Ultimate ASI Loader
+      run: |
+        unzip Ultimate-ASI-Loader_x64.zip -d .\
+        C:\msys64\usr\bin\wget.exe -O .\UltimateASILoader_LICENSE.md https://raw.githubusercontent.com/ThirteenAG/Ultimate-ASI-Loader/master/license
+        
+    - name: Create Directory Structure
+      run: |
+        mkdir .\zip\End\Binaries\Win64
+
+    - name: Prepare Release Files
+      run: |
+        cp ${{ github.event.repository.name }}.asi .\zip\End\Binaries\Win64
+        cp ${{ github.event.repository.name }}.ini .\zip\End\Binaries\Win64
+        cp dinput8.dll .\zip\End\Binaries\Win64\dsound.dll        
+        cp UltimateASILoader_LICENSE.md .\zip\End\Binaries\Win64\
+        New-Item -Path ".\zip\EXTRACT_TO_GAME_FOLDER" -ItemType File
+    
+    - name: Create Release Zip
+      run: |
+        cd .\zip
+        Compress-Archive -Path .\* -DestinationPath ..\${{ github.event.repository.name }}_${{ github.event.inputs.version }}.zip
+
+    - name: Update release_body.md
+      run: |
+        $releaseBody = "release_body.md"
+        $zipName = "${{ github.event.repository.name }}_${{ github.event.inputs.version }}.zip" 
+        (Get-Content $releaseBody -Raw) -replace '<RELEASE_ZIP_NAME>', $zipName | Set-Content $releaseBody
+        
+    - uses: ncipollo/release-action@v1
+      with:
+        artifacts: "${{ github.event.repository.name }}_${{ github.event.inputs.version }}.zip"
+        token: ${{ secrets.GITHUB_TOKEN }}
+        tag: ${{ github.event.inputs.version }}
+        name: "${{ github.event.inputs.version }}"
+        draft: true
+        bodyFile: "release_body.md"
+        generateReleaseNotes: false
+        artifactErrorsFailBuild: true

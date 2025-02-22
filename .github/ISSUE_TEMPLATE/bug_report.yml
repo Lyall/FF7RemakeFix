@@ -1,0 +1,55 @@
+name: Bug Report
+description: Report an issue with FF7RemakeFix
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "## Please fill out the details below."
+
+  - type: input
+    id: version
+    attributes:
+      label: "Version Number"
+      description: "Which version of FF7RemakeFix are you using? (Check the release name or `FF7RemakeFix.log`)"
+      placeholder: "e.g., v0.0.1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Describe the Issue"
+      description: "What happened? Provide a clear and concise description of the bug."
+      placeholder: "Example: The game crashes when entering a specific area..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: "Steps to Reproduce"
+      description: "How can the issue be reproduced? Provide step-by-step instructions."
+      placeholder: |
+        1. Launch the game
+        2. Load a specific save
+        3. Trigger the issue
+        4. Observe the bug
+    validations:
+      required: true
+
+  - type: textarea
+    id: log-file
+    attributes:
+      label: "Log File"
+      description: "Please upload `FF7RemakeFix.log` from `FINAL FANTASY VII Remake\\End\\Binaries\\Win64`."
+    validations:
+      required: true
+
+  - type: textarea
+    id: save-file
+    attributes:
+      label: "Save Game (If Relevant)"
+      description: "If the subject of the issue can be accessed through a save game, please attach the relevant save file from:\n`%USERPROFILE%\\Documents\\My Games\\FINAL FANTASY VII Remake\\Steam\\<user-id>\\`"
+    validations:
+      required: false
