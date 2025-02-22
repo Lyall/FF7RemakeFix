@@ -359,7 +359,7 @@ void AspectRatioFOV()
             static SafetyHookMid AspectRatioMidHook{};
             AspectRatioMidHook = safetyhook::create_mid(AspectRatioFOVScanResult + 0xB,
                 [](SafetyHookContext& ctx) {
-                    if (fAspectRatio != fNativeAspect)
+                    if (!bMovieIsPlaying && fAspectRatio != fNativeAspect)
                         ctx.rax = *(uint32_t*)(&fAspectRatio);
                 });
         }
@@ -420,14 +420,12 @@ void HUD()
             static SafetyHookMid HUDSizeMidHook{};
             HUDSizeMidHook = safetyhook::create_mid(HUDSizeScanResult,
                 [](SafetyHookContext& ctx) {
-                    //if (!bMovieIsPlaying) {
-                        if (fAspectRatio != fNativeAspect) {
-                            ctx.xmm7.f32[3] = fHUDScale;
-                            ctx.xmm8.f32[2] = fHUDScale;
-                            ctx.xmm8.f32[3] = fHUDWidthOffset;
-                            ctx.xmm9.f32[0] = fHUDHeightOffset;
-                        }
-                    //}
+                    if (!bMovieIsPlaying && fAspectRatio != fNativeAspect) {
+                        ctx.xmm7.f32[3] = fHUDScale;
+                        ctx.xmm8.f32[2] = fHUDScale;
+                        ctx.xmm8.f32[3] = fHUDWidthOffset;
+                        ctx.xmm9.f32[0] = fHUDHeightOffset;
+                    }
                 });
         }
         else {
@@ -451,32 +449,27 @@ void HUD()
         }
 
         // HUD: Movie
-        std::uint8_t* HideMovieScanResult = Memory::PatternScan(exeModule, "49 83 ?? ?? 00 74 ?? 48 8B ?? ?? ?? ?? ?? C6 80 ?? ?? ?? ?? 00 C3");
-        std::uint8_t* ShowMovieScanResult = Memory::PatternScan(exeModule, "C7 ?? ?? FF FF FF FF 33 ?? 48 8B ?? 89 ?? ?? 48 8B ?? E8 ?? ?? ?? ?? 48 8B ?? ??");
-        if (HideMovieScanResult && ShowMovieScanResult) {
-            spdlog::info("HUD: Movie: Hide: Address is {:s}+{:x}", sExeName.c_str(), HideMovieScanResult - (std::uint8_t*)exeModule);
-
-            static SafetyHookMid HideMovieMidHook{};
-            HideMovieMidHook = safetyhook::create_mid(HideMovieScanResult + 0x7,
+        std::uint8_t* MovieViewportScanResult = Memory::PatternScan(exeModule, "0F ?? ?? ?? ?? ?? ?? B8 ?? ?? ?? ?? BA ?? ?? ?? ?? 41 ?? ?? 0F ?? ?? 41 ?? ??");
+        if (MovieViewportScanResult) {
+            spdlog::info("HUD: Movie: Viewport: Address is {:s}+{:x}", sExeName.c_str(), MovieViewportScanResult - (std::uint8_t*)exeModule);
+            static SafetyHookMid MovieViewportMidHook{};
+            MovieViewportMidHook = safetyhook::create_mid(MovieViewportScanResult + 0x7,
                 [](SafetyHookContext& ctx) {
-                    #ifdef _DEBUG
-                    spdlog::info("EndMenu.HideMovie()");
-                    #endif
-                    bMovieIsPlaying = false;
-                });
+                    if ((ctx.rflags & (1ULL << 6)) == 0)
+                        bMovieIsPlaying = true;
+                    else
+                        bMovieIsPlaying = false;
 
-            spdlog::info("HUD: Movie: Show: Address is {:s}+{:x}", sExeName.c_str(), ShowMovieScanResult - (std::uint8_t*)exeModule);
-            static SafetyHookMid ShowMovieMidHook{};
-            ShowMovieMidHook = safetyhook::create_mid(ShowMovieScanResult - 0x16,
-                [](SafetyHookContext& ctx) {
-                    #ifdef _DEBUG
-                    spdlog::info("EndMenu.ShowMovie()");
-                    #endif
-                    bMovieIsPlaying = true;
+                    if (bMovieIsPlaying && ctx.rdi) {
+                        if (fAspectRatio > fNativeAspect)
+                            *reinterpret_cast<int*>(ctx.rdi + 0x88) = (int)ceilf(iCurrentResY * fNativeAspect);
+                        else if (fAspectRatio < fNativeAspect)
+                            *reinterpret_cast<int*>(ctx.rdi + 0x8C) = (int)ceilf(iCurrentResX / fNativeAspect);
+                    }
                 });
         }
         else {
-            spdlog::error("HUD: Movie: Pattern scan(s) failed.");
+            spdlog::error("HUD: Movie: Pattern scan failed.");
         }
 
         /*
@@ -641,7 +634,8 @@ void HUD()
 
                             UMGLoading = (SDK::ULoca_Loading_C*)obj;
 
-                            // TODO
+                            auto rw = (SDK::UEndCanvasPanel*)UMGLoading->WidgetTree->RootWidget;
+                            auto slot = (SDK::UEndCanvasPanelSlot*)rw->Slots[2];
                         }
 
                         // "Coliseum_Top_C", battle arena
