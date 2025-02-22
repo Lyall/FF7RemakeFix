@@ -30,6 +30,7 @@
     <ClCompile Include="src\dllmain.cpp" />
     <ClCompile Include="src\SDK\Basic.cpp" />
     <ClCompile Include="src\SDK\CoreUObject_functions.cpp" />
+    <ClCompile Include="src\SDK\EndGame_functions.cpp" />
     <ClCompile Include="src\SDK\Engine_functions.cpp" />
     <ClCompile Include="src\SDK\UMG_functions.cpp" />
   </ItemGroup>
