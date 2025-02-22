@@ -2,6 +2,11 @@
 #include "helper.hpp"
 
 #include "SDK/Engine_classes.hpp"
+#include "SDK/EndGame_classes.hpp"
+#include "SDK/Loca_Loading_classes.hpp"
+#include "SDK/Pause_00_classes.hpp"
+#include "SDK/BattleTips_classes.hpp"
+#include "SDK/Com_Window_01_classes.hpp"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
@@ -97,7 +102,7 @@ void Logging()
         freopen_s(&dummy, "CONOUT$", "w", stdout);
         std::cout << "Log initialisation failed: " << ex.what() << std::endl;
         FreeLibraryAndExitThread(thisModule, 1);
-    }  
+    }
 }
 
 void Configuration()
@@ -250,7 +255,7 @@ void CalculateHUD(bool bLog)
 }
 
 void UpdateOffsets()
-{  
+{
     // GObjects
     std::uint8_t* GObjectsScanResult = Memory::PatternScan(exeModule, "48 8D ?? ?? 48 8B ?? ?? ?? ?? ?? 48 8D ?? ?? 48 85 ?? 74 ?? 44 39 ?? ?? 75 ??");
     if (GObjectsScanResult) {
@@ -263,7 +268,7 @@ void UpdateOffsets()
         spdlog::error("Offsets: GObjects: Pattern scan failed.");
     }
 
-  
+
     // GNames
     std::uint8_t* GNamesScanResult = Memory::PatternScan(exeModule, "48 8D ?? ?? ?? ?? ?? 33 ?? 8B ?? 85 ?? 75 ?? 48 89 ?? ?? ?? ?? ?? EB ??");
     if (GNamesScanResult) {
@@ -361,7 +366,7 @@ void AspectRatioFOV()
         else {
             spdlog::error("Aspect Ratio/FOV: Pattern scan failed.");
         }
-    } 
+    }
 }
 
 void HUD()
@@ -415,14 +420,14 @@ void HUD()
             static SafetyHookMid HUDSizeMidHook{};
             HUDSizeMidHook = safetyhook::create_mid(HUDSizeScanResult,
                 [](SafetyHookContext& ctx) {
-                    if (!bMovieIsPlaying) {
+                    //if (!bMovieIsPlaying) {
                         if (fAspectRatio != fNativeAspect) {
                             ctx.xmm7.f32[3] = fHUDScale;
                             ctx.xmm8.f32[2] = fHUDScale;
                             ctx.xmm8.f32[3] = fHUDWidthOffset;
                             ctx.xmm9.f32[0] = fHUDHeightOffset;
                         }
-                    }
+                    //}
                 });
         }
         else {
@@ -474,14 +479,183 @@ void HUD()
             spdlog::error("HUD: Movie: Pattern scan(s) failed.");
         }
 
+        /*
+        // Fades
+        std::uint8_t* HUDFadesScanResult = Memory::PatternScan(exeModule, "48 8D ?? ?? ?? ?? ?? F2 0F ?? ?? ?? 0F ?? ?? C6 ?? ?? 01 4C ?? ?? ?? ?? ?? ?? 0F ?? ?? ??");
+        if (HUDFadesScanResult) {
+            spdlog::info("HUD: Fades: Address is {:s}+{:x}", sExeName.c_str(), HUDFadesScanResult - (std::uint8_t*)exeModule);
+            static SafetyHookMid HUDFadesSizeMidHook{};
+            HUDFadesSizeMidHook = safetyhook::create_mid(HUDFadesScanResult,
+                [](SafetyHookContext& ctx) {
+                    if (!bMovieIsPlaying) {
+                        if (fAspectRatio > fNativeAspect)
+                            ctx.xmm0.f32[0] = (ctx.xmm0.f32[1] * fAspectRatio);
+                        else if (fAspectRatio < fNativeAspect)
+                            ctx.xmm0.f32[1] = (ctx.xmm0.f32[0] / fAspectRatio);
+                    }
+                });
+
+            static SafetyHookMid HUDFadesOffsetMidHook{};
+            HUDFadesOffsetMidHook = safetyhook::create_mid(HUDFadesScanResult,
+                [](SafetyHookContext& ctx) {
+                    if (!bMovieIsPlaying) {
+                        if (fAspectRatio > fNativeAspect)
+                            ctx.xmm0.f32[0] = 0.00f;
+                        else if (fAspectRatio < fNativeAspect)
+                            ctx.xmm0.f32[1] = 0.00f;
+                    }
+                });
+        }
+        else {
+            spdlog::error("HUD: Fades: Pattern scan failed.");
+        }
+        */
+
         // HUD Widgets
         std::uint8_t* HUDWidgetsScanResult = Memory::PatternScan(exeModule, "48 8D ?? ?? ?? ?? ?? 89 ?? ?? 48 89 ?? ?? ?? 41 ?? 03 00 00 00 0F 28 ?? ?? ??");
         if (HUDWidgetsScanResult) {
+            static SDK::UObject* obj = nullptr;
+            static SDK::UObject* oldObj = nullptr;
+
+            static std::string objName;
+            static std::string objOldName;
+
+            static SDK::ULoca_Loading_C* UMGLoading = nullptr;
+            static SDK::UEndUserWidget* UMGColiseum = nullptr;
+            static SDK::UPause_00_C* UMGPause = nullptr;
+            static SDK::UBattleTips_C* UMGBattleTips = nullptr;
+            static SDK::UCom_Window_01_C* UMGComWindow = nullptr;
+
             spdlog::info("HUD: Widgets: Address is {:s}+{:x}", sExeName.c_str(), HUDWidgetsScanResult - (std::uint8_t*)exeModule);
             static SafetyHookMid HUDWidgetsMidHook{};
             HUDWidgetsMidHook = safetyhook::create_mid(Memory::GetAbsolute(HUDWidgetsScanResult + 0x3),
                 [](SafetyHookContext& ctx) {
                     SDK::UObject* obj = (SDK::UObject*)ctx.rcx;
+
+                    // Check if object has changed
+                    if (obj != oldObj) {
+                        oldObj = obj;
+
+                        // Only store the name of the object when it has changed
+                        objName = obj->GetName();
+
+                        // "MainMenu_Base_Test_C", main menu background
+                        if (objName.contains("MainMenu_Base_Test_C")) {
+                            if (fAspectRatio > fNativeAspect) {
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1B0) = -(fHUDWidthOffset / fHUDWidth);
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1B4) = 0.00f;
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1B8) = 1.00f + (fHUDWidthOffset / fHUDWidth);
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1BC) = 1.00f;
+                            }
+                            else if (fAspectRatio < fNativeAspect) {
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1B0) = 0.00f;
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1B4) = -(fHUDHeightOffset / fHUDHeight);
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1B8) = 1.00f;
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1BC) = 1.00f + (fHUDHeightOffset / fHUDHeight);
+                            }
+                        }
+
+                        // "Pause_00_C", "simple" pause menu
+                        if (objName.contains("Pause_00_C") && UMGPause != obj) {
+                            #ifdef _DEBUG
+                            spdlog::info("HUD: Widgets: Pause Menu: {}", objName);
+                            spdlog::info("HUD: Widgets: Pause Menu: Address: {:x}", (uintptr_t)obj);
+                            #endif
+
+                            // Cache address
+                            UMGPause = (SDK::UPause_00_C*)obj;
+
+                            // Get panel slots
+                            SDK::UEndCanvasPanelSlot* bg1Slot = (SDK::UEndCanvasPanelSlot*)UMGPause->Img_BG->Slot;
+                            SDK::UEndCanvasPanelSlot* bg2Slot = (SDK::UEndCanvasPanelSlot*)UMGPause->Img_BG2->Slot;
+
+                            // Create offsets
+                            SDK::FMargin bg1offsets = bg1Slot->GetOffsets();
+                            SDK::FMargin bg2offsets = bg2Slot->GetOffsets();
+
+                            // Adjust offsets to allow backgrounds to fill the screen
+                            if (fAspectRatio > fNativeAspect) {
+                                bg1offsets.RIGHT = 1080.00f * fAspectRatio;
+                                bg2offsets.RIGHT = 1080.00f * fAspectRatio;
+                            }
+                            else if (fAspectRatio < fNativeAspect) {
+                                bg1offsets.Bottom = 1920.00f / fAspectRatio;
+                                bg2offsets.Bottom = 1920.00f / fAspectRatio;
+                            }
+
+                            // Set adjusted offsets
+                            bg1Slot->SetOffsets(bg1offsets);
+                            bg2Slot->SetOffsets(bg2offsets);
+                        }
+
+                        // "Com_Window_01_C", menu dialog window
+                        if (objName.contains("Com_Window_01_C") && UMGComWindow != obj) {
+                            #ifdef _DEBUG
+                            spdlog::info("HUD: Widgets: Com Window: {}", objName);
+                            spdlog::info("HUD: Widgets: Com Window: Address: {:x}", (uintptr_t)obj);
+                            #endif
+
+                            // Cache address
+                            UMGComWindow = (SDK::UCom_Window_01_C*)obj;
+
+                            // Adjust to span the screen
+                            if (fAspectRatio > fNativeAspect) {
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1B0) = -(fHUDWidthOffset / fHUDWidth);
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1B4) = 0.00f;
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1B8) = 1.00f + (fHUDWidthOffset / fHUDWidth);
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1BC) = 1.00f;
+                            }
+                            else if (fAspectRatio < fNativeAspect) {
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1B0) = 0.00f;
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1B4) = -(fHUDHeightOffset / fHUDHeight);
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1B8) = 1.00f;
+                                *reinterpret_cast<float*>(ctx.rcx + 0x1BC) = 1.00f + (fHUDHeightOffset / fHUDHeight);
+                            }
+                        }
+
+                        // "BattleTips_C", tutorial windows
+                        if (objName.contains("BattleTips_C") && UMGBattleTips != obj) {
+                            #ifdef _DEBUG
+                            spdlog::info("HUD: Widgets: Battle Tips: {}", objName);
+                            spdlog::info("HUD: Widgets: Battle Tips: Address: {:x}", (uintptr_t)obj);
+                            #endif
+
+                            // Cache address
+                            UMGBattleTips = (SDK::UBattleTips_C*)obj;
+
+                            // Adjust background to span the screen
+                            if (UMGBattleTips->Img_BlackFilter) {
+                                if (fAspectRatio > fNativeAspect)
+                                    UMGBattleTips->Img_BlackFilter->SetRenderScale(SDK::FVector2D(fAspectMultiplier, 1.00f));
+                                else if (fAspectRatio < fNativeAspect)
+                                    UMGBattleTips->Img_BlackFilter->SetRenderScale(SDK::FVector2D(1.00f, 1.00f / fAspectMultiplier));
+                            }
+                        }
+
+                        // "Loca_Loading_C", loading screens
+                        if (objName.contains("Loca_Loading_C") && UMGLoading != obj) {
+                            #ifdef _DEBUG
+                            spdlog::info("HUD: Widgets: Loading: {}", objName);
+                            spdlog::info("HUD: Widgets: Loading: Address: {:x}", (uintptr_t)obj);
+                            #endif
+
+                            UMGLoading = (SDK::ULoca_Loading_C*)obj;
+
+                            // TODO
+                        }
+
+                        // "Coliseum_Top_C", battle arena
+                        if (objName.contains("Coliseum_Top_C") && UMGColiseum != obj) {
+                            #ifdef _DEBUG
+                            spdlog::info("HUD: Widgets: Coliseum: {}", objName);
+                            spdlog::info("HUD: Widgets: Coliseum: Address: {:x}", (uintptr_t)obj);
+                            #endif
+
+                            UMGColiseum = (SDK::UEndUserWidget*)obj;
+
+                            // TODO
+                        }
+                    }
                 });
         }
         else {
