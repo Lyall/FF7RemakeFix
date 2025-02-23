@@ -459,7 +459,7 @@ void HUD()
                     else
                         bMovieIsPlaying = false;
 
-                    if (bMovieIsPlaying && ctx.rdi) {
+                    if (bMovieIsPlaying && ctx.rdi && iScreenMode == 1) {
                         if (fAspectRatio > fNativeAspect)
                             *reinterpret_cast<int*>(ctx.rdi + 0x88) = (int)ceilf(iCurrentResY * fNativeAspect);
                         else if (fAspectRatio < fNativeAspect)
@@ -478,7 +478,7 @@ void HUD()
             static SafetyHookMid HUDFadesMidHook{};
             HUDFadesMidHook = safetyhook::create_mid(HUDFadesScanResult,
                 [](SafetyHookContext& ctx) {
-                    // This is some hacky shite, find a better way to fix this >:(
+                    // This is a bit jank
                     if (ctx.rcx && ctx.xmm0.f32[0] >= 1919.00f && ctx.xmm0.f32[0] <= 1921.00f) {
                         if (fAspectRatio > fNativeAspect) {
                             *reinterpret_cast<float*>(ctx.rcx + 0x10) = 0.00f;
