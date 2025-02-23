@@ -163,7 +163,6 @@ void CalculateAspectRatio(bool bLog)
 
     // Log details about current resolution
     if (bLog) {
-        spdlog::info("----------");
         spdlog::info("Current Resolution: Resolution: {:d}x{:d}", iCurrentResX, iCurrentResY);
         spdlog::info("Current Resolution: iScreenMode: {}", iScreenMode);
         spdlog::info("Current Resolution: fAspectRatio: {}", fAspectRatio);
@@ -235,11 +234,9 @@ void CalculateHUD(bool bLog)
 
     // Calculate HUD scale
     fHUDScale = std::ceilf((fHUDHeight / 1080.00f) * 1000.00f) / 1000.00f;
-    fHUDScale += 0.001f; // fudgey
 
     // Log details about current HUD size
     if (bLog) {
-        spdlog::info("----------");
         spdlog::info("HUD: Resolution: {}x{} - ResScale: {}", iRenderTargetX, iRenderTargetY, ResScale);
         spdlog::info("HUD: fHUDWidth: {}", fHUDWidth);
         spdlog::info("HUD: fHUDHeight: {}", fHUDHeight);
@@ -261,7 +258,7 @@ void UpdateOffsets()
         spdlog::info("Offsets: GObjects: Address is {:s}+{:x}", sExeName.c_str(), GObjectsScanResult - (std::uint8_t*)exeModule);
         std::uint8_t* GObjectsAddr = Memory::GetAbsolute(GObjectsScanResult + 0x7);
         SDK::Offsets::GObjects = static_cast<UC::uint32>(GObjectsAddr - (std::uint8_t*)exeModule);
-        spdlog::info("Offsets: GObjects: Offset: {:x}", SDK::Offsets::GObjects);
+        spdlog::info("Offsets: GObjects: 0x{:x}", SDK::Offsets::GObjects);
     }
     else {
         spdlog::error("Offsets: GObjects: Pattern scan failed.");
@@ -274,7 +271,7 @@ void UpdateOffsets()
         spdlog::info("Offsets: GNames: Address is {:s}+{:x}", sExeName.c_str(), GNamesScanResult - (std::uint8_t*)exeModule);
         std::uint8_t* GNamesAddr = Memory::GetAbsolute(GNamesScanResult + 0x3);
         SDK::Offsets::GNames = static_cast<UC::uint32>(GNamesAddr - (std::uint8_t*)exeModule);
-        spdlog::info("Offsets: GNames: Offset: {:x}", SDK::Offsets::GNames);
+        spdlog::info("Offsets: GNames: 0x{:x}", SDK::Offsets::GNames);
     }
     else {
         spdlog::error("Offsets: GNames: Pattern scan failed.");
@@ -285,11 +282,13 @@ void UpdateOffsets()
     if (ProcessEventScanResult) {
         spdlog::info("Offsets: ProcessEvent: Address is {:s}+{:x}", sExeName.c_str(), ProcessEventScanResult - (std::uint8_t*)exeModule);
         SDK::Offsets::ProcessEvent = static_cast<UC::uint32>(ProcessEventScanResult - (std::uint8_t*)exeModule);
-        spdlog::info("Offsets: ProcessEvent: Offset: {:x}", SDK::Offsets::ProcessEvent);
+        spdlog::info("Offsets: ProcessEvent: 0x{:x}", SDK::Offsets::ProcessEvent);
     }
     else {
         spdlog::error("Offsets: ProcessEvent: Pattern scan failed.");
     }
+
+    spdlog::info("----------");
 }
 
 void Resolution()
@@ -434,7 +433,7 @@ void HUD()
         // HUD: Map
         std::uint8_t* HUDMapUpperScanResult = Memory::PatternScan(exeModule, "F3 0F ?? ?? ?? 49 8B ?? ?? ?? ?? ?? F3 44 ?? ?? ?? F3 44 ?? ?? ?? ?? F3 45 ?? ?? ?? 48 8B ??");
         if (HUDMapUpperScanResult) {
-            spdlog::info("HUD: Map: Upper: Address is {:s}+{:x}", sExeName.c_str(), HUDMapUpperScanResult - (std::uint8_t*)exeModule);
+            spdlog::info("HUD: Map: Address is {:s}+{:x}", sExeName.c_str(), HUDMapUpperScanResult - (std::uint8_t*)exeModule);
             static SafetyHookMid HUDMapUpperMidHook{};
             HUDMapUpperMidHook = safetyhook::create_mid(HUDMapUpperScanResult,
                 [](SafetyHookContext& ctx) {
@@ -657,6 +656,8 @@ void Graphics()
             spdlog::error("Post Processing: Pattern scan failed.");
         }
     }
+
+    spdlog::info("----------");
 }
 
 DWORD __stdcall Main(void*)
