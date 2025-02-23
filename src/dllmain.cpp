@@ -163,7 +163,7 @@ void CalculateAspectRatio(bool bLog)
 
     // Log details about current resolution
     if (bLog) {
-        spdlog::info("Current Resolution: Resolution: {:d}x{:d}", iCurrentResX, iCurrentResY);
+        spdlog::info("Current Resolution: {:d}x{:d}", iCurrentResX, iCurrentResY);
         spdlog::info("Current Resolution: iScreenMode: {}", iScreenMode);
         spdlog::info("Current Resolution: fAspectRatio: {}", fAspectRatio);
         spdlog::info("Current Resolution: fAspectMultiplier: {}", fAspectMultiplier);
@@ -377,16 +377,14 @@ void HUD()
             static SafetyHookMid HUDRenderTargetMidHook{};
             HUDRenderTargetMidHook = safetyhook::create_mid(HUDRenderTargetScanResult + 0x6,
                 [](SafetyHookContext& ctx) {
-                    if (fAspectRatio != fNativeAspect) {
-                        // Calculate new HUD size if resolution changed
-                        if (bHUDNeedsResize) {
-                            CalculateHUD(true);
-                        }
-
-                        // Set render target dimensions 
-                        *reinterpret_cast<int*>(ctx.rdi + 0x240) = iRenderTargetX;
-                        *reinterpret_cast<int*>(ctx.rdi + 0x244) = iRenderTargetY;
+                    // Calculate new HUD size if resolution changed
+                    if (bHUDNeedsResize) {
+                        CalculateHUD(true);
                     }
+
+                    // Set render target dimensions 
+                    *reinterpret_cast<int*>(ctx.rdi + 0x240) = iRenderTargetX;
+                    *reinterpret_cast<int*>(ctx.rdi + 0x244) = iRenderTargetY;
                 });
         }
         else {
@@ -449,7 +447,7 @@ void HUD()
         // HUD: Movie
         std::uint8_t* MovieViewportScanResult = Memory::PatternScan(exeModule, "0F ?? ?? ?? ?? ?? ?? B8 ?? ?? ?? ?? BA ?? ?? ?? ?? 41 ?? ?? 0F ?? ?? 41 ?? ??");
         if (MovieViewportScanResult) {
-            spdlog::info("HUD: Movie: Viewport: Address is {:s}+{:x}", sExeName.c_str(), MovieViewportScanResult - (std::uint8_t*)exeModule);
+            spdlog::info("HUD: Movies: Address is {:s}+{:x}", sExeName.c_str(), MovieViewportScanResult - (std::uint8_t*)exeModule);
             static SafetyHookMid MovieViewportMidHook{};
             MovieViewportMidHook = safetyhook::create_mid(MovieViewportScanResult + 0x7,
                 [](SafetyHookContext& ctx) {
@@ -467,10 +465,10 @@ void HUD()
                 });
         }
         else {
-            spdlog::error("HUD: Movie: Pattern scan failed.");
+            spdlog::error("HUD: Movies: Pattern scan failed.");
         }
 
-        // Fades
+        // HUD: Fades
         std::uint8_t* HUDFadesScanResult = Memory::PatternScan(exeModule, "41 ?? FF FF FF FF F2 0F ?? ?? ?? 48 ?? ?? ?? ?? ?? ?? 85 ?? 7E ?? 48 8B ??");
         if (HUDFadesScanResult) {
             spdlog::info("HUD: Fades: Address is {:s}+{:x}", sExeName.c_str(), HUDFadesScanResult - (std::uint8_t*)exeModule);
@@ -494,7 +492,39 @@ void HUD()
             spdlog::error("HUD: Fades: Pattern scan failed.");
         }
 
-        // HUD Widgets
+        // HUD: Composite layer
+        std::uint8_t* HUDCompositeLayerScanResult = Memory::PatternScan(exeModule, "0F 11 ?? ?? ?? ?? ?? C7 ?? ?? 00 00 00 00 48 ?? ?? ?? 00 00 00 00 0F 28 ??");
+        if (HUDCompositeLayerScanResult) {
+            spdlog::info("HUD: Composite Layer: Address is {:s}+{:x}", sExeName.c_str(), HUDCompositeLayerScanResult - (std::uint8_t*)exeModule);
+            static SafetyHookMid HUDCompositeLayerMidHook{};
+            HUDCompositeLayerMidHook = safetyhook::create_mid(HUDCompositeLayerScanResult,
+                [](SafetyHookContext& ctx) {
+                    ctx.xmm3.f32[0] = fNativeAspect;
+
+                    if (fAspectRatio > fNativeAspect)
+                        ctx.xmm0.f32[0] = 1.00f / fAspectMultiplier;
+                });
+        }
+        else {
+            spdlog::error("HUD: Composite Layer: Pattern scan failed.");
+        }
+
+        // HUD: Materia FX
+        std::uint8_t* HUDMateriaFXScanResult = Memory::PatternScan(exeModule, "F3 0F ?? ?? F3 0F ?? ?? F3 0F ?? ?? ?? 0F 28 ?? ?? ?? 48 8B ?? 48 8B ?? ?? ?? 44 0F ?? ?? ?? ?? 48 83 ?? ??");
+        if (HUDMateriaFXScanResult) {
+            spdlog::info("HUD: Materia FX: Address is {:s}+{:x}", sExeName.c_str(), HUDMateriaFXScanResult - (std::uint8_t*)exeModule);
+            static SafetyHookMid HUDMateriaFXMidHook{};
+            HUDMateriaFXMidHook = safetyhook::create_mid(HUDMateriaFXScanResult,
+                [](SafetyHookContext& ctx) {
+                    if (fAspectRatio > fNativeAspect)
+                        ctx.xmm0.f32[0] = -1.00f / fAspectMultiplier;
+                });
+        }
+        else {
+            spdlog::error("HUD: Materia FX: Pattern scan failed.");
+        }
+
+        // HUD: Widgets
         std::uint8_t* HUDWidgetsScanResult = Memory::PatternScan(exeModule, "48 8D ?? ?? ?? ?? ?? 89 ?? ?? 48 89 ?? ?? ?? 41 ?? 03 00 00 00 0F 28 ?? ?? ??");
         if (HUDWidgetsScanResult) {
             static SDK::UObject* obj = nullptr;
