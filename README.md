@@ -6,10 +6,11 @@ This is an ASI plugin for Final Fantasy VII Remake that adds ultrawide/narrower 
 
 ## Features
 ### General
+- Support for custom resolutions.
 - Disable/adjust vignette.
 
 ### Ultrawide/Narrower
-- Support for ultrawide or narrower displays with correct FOV.
+- Corrected aspect ratio and FOV.
 - Centered 16:9 HUD.
 
 ## Installation
@@ -27,11 +28,15 @@ This is an ASI plugin for Final Fantasy VII Remake that adds ultrawide/narrower 
 ## Known Issues
 Please report any issues you see. This list will contain bugs which may or may not be fixed.
 
+#### Ultrawide/Narrower
+- Combat simulator transition cutscene is displayed at the wrong aspect ratio.
+- Map menu has a blue tint when at <16:9.
+
 ## Recommended Mods
 - [FFVIIHook](https://www.nexusmods.com/finalfantasy7remake/mods/74) by [emoose](https://github.com/emoose) - Unlocks the console, allows overriding certain cvars and more.
 
 ## Screenshots
-|  |
+| ![ezgif-83cb3f9957178e](https://github.com/user-attachments/assets/11eb03e6-34e1-47d3-87c7-c555f10e929f) |
 |:--------------------------:|
 | Gameplay |
 
