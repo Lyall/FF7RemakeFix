@@ -377,14 +377,16 @@ void HUD()
             static SafetyHookMid HUDRenderTargetMidHook{};
             HUDRenderTargetMidHook = safetyhook::create_mid(HUDRenderTargetScanResult + 0x6,
                 [](SafetyHookContext& ctx) {
-                    // Calculate new HUD size if resolution changed
-                    if (bHUDNeedsResize) {
-                        CalculateHUD(true);
-                    }
+                    if (fAspectRatio != fNativeAspect) {
+                        // Calculate new HUD size if resolution changed
+                        if (bHUDNeedsResize) {
+                            CalculateHUD(true);
+                        }
 
-                    // Set render target dimensions 
-                    *reinterpret_cast<int*>(ctx.rdi + 0x240) = iRenderTargetX;
-                    *reinterpret_cast<int*>(ctx.rdi + 0x244) = iRenderTargetY;
+                        // Set render target dimensions 
+                        *reinterpret_cast<int*>(ctx.rdi + 0x240) = iRenderTargetX;
+                        *reinterpret_cast<int*>(ctx.rdi + 0x244) = iRenderTargetY;
+                    }
                 });
         }
         else {
@@ -450,10 +452,7 @@ void HUD()
             static SafetyHookMid MovieViewportMidHook{};
             MovieViewportMidHook = safetyhook::create_mid(MovieViewportScanResult + 0x7,
                 [](SafetyHookContext& ctx) {
-                    if ((ctx.rflags & (1ULL << 6)) == 0)
-                        bMovieIsPlaying = true;
-                    else
-                        bMovieIsPlaying = false;
+                    bMovieIsPlaying = ((ctx.rflags & (1ULL << 6)) == 0);
 
                     if (bMovieIsPlaying && ctx.rdi && iScreenMode == 1) {
                         if (fAspectRatio > fNativeAspect)
