@@ -205,7 +205,7 @@ void CalculateHUD(bool bLog)
     iRenderTargetX = static_cast<int>(iRenderTargetX * ResScale);
     iRenderTargetY = static_cast<int>(iRenderTargetY * ResScale);
 
-    // Don't allow resolution of render target to exceed 16384 on either axis
+    // Don't allow the resolution of the render target to exceed 16384 on either axis
     if (iRenderTargetX > MAX_RENDER_TARGET_SIZE || iRenderTargetY > MAX_RENDER_TARGET_SIZE) {
         float scaleFactorX = static_cast<float>(MAX_RENDER_TARGET_SIZE) / iRenderTargetX;
         float scaleFactorY = static_cast<float>(MAX_RENDER_TARGET_SIZE) / iRenderTargetY;
@@ -246,7 +246,7 @@ void CalculateHUD(bool bLog)
         spdlog::info("----------");
     }
 
-    // Signal that HUD resize is done
+    // Signal that HUD resize is over
     bHUDNeedsResize = false;
 }
 
@@ -357,8 +357,9 @@ void AspectRatioFOV()
             static SafetyHookMid AspectRatioMidHook{};
             AspectRatioMidHook = safetyhook::create_mid(AspectRatioFOVScanResult + 0xB,
                 [](SafetyHookContext& ctx) {
+                    // Apply corrected aspect ratio unless a movie is playing
                     if (!bMovieIsPlaying && fAspectRatio != fNativeAspect)
-                        ctx.rax = *(uint32_t*)(&fAspectRatio);
+                        ctx.rax = *(uint32_t*)&fAspectRatio;
                 });
         }
         else {
@@ -445,7 +446,7 @@ void HUD()
             spdlog::error("HUD: Map: Pattern scan failed.");
         }
 
-        // HUD: Movie
+        // HUD: Movies
         std::uint8_t* MovieViewportScanResult = Memory::PatternScan(exeModule, "0F ?? ?? ?? ?? ?? ?? B8 ?? ?? ?? ?? BA ?? ?? ?? ?? 41 ?? ?? 0F ?? ?? 41 ?? ??");
         if (MovieViewportScanResult) {
             spdlog::info("HUD: Movies: Address is {:s}+{:x}", sExeName.c_str(), MovieViewportScanResult - (std::uint8_t*)exeModule);
@@ -454,6 +455,7 @@ void HUD()
                 [](SafetyHookContext& ctx) {
                     bMovieIsPlaying = ((ctx.rflags & (1ULL << 6)) == 0);
 
+                    // Resize viewport when using borderless as adjusting the aspect ratio does not
                     if (bMovieIsPlaying && ctx.rdi && iScreenMode == 1) {
                         if (fAspectRatio > fNativeAspect)
                             *reinterpret_cast<int*>(ctx.rdi + 0x88) = (int)ceilf(iCurrentResY * fNativeAspect);
