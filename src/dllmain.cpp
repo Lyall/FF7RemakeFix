@@ -498,28 +498,16 @@ void HUD()
             HUDCompositeLayerMidHook = safetyhook::create_mid(HUDCompositeLayerScanResult,
                 [](SafetyHookContext& ctx) {   
                     if (fAspectRatio > fNativeAspect) {
-                        ctx.xmm3.f32[0] = fNativeAspect;
                         ctx.xmm0.f32[0] = 1.00f / fAspectMultiplier;
+                        ctx.xmm3.f32[0] = fNativeAspect / fAspectMultiplier;
+                    }
+                    else if (fAspectRatio < fNativeAspect) {
+                        ctx.xmm0.f32[0] = fAspectRatio / fNativeAspect;
                     }
                 });
         }
         else {
             spdlog::error("HUD: Composite Layer: Pattern scan failed.");
-        }
-
-        // HUD: Materia FX
-        std::uint8_t* HUDMateriaFXScanResult = Memory::PatternScan(exeModule, "F3 0F ?? ?? F3 0F ?? ?? F3 0F ?? ?? ?? 0F 28 ?? ?? ?? 48 8B ?? 48 8B ?? ?? ?? 44 0F ?? ?? ?? ?? 48 83 ?? ??");
-        if (HUDMateriaFXScanResult) {
-            spdlog::info("HUD: Materia FX: Address is {:s}+{:x}", sExeName.c_str(), HUDMateriaFXScanResult - (std::uint8_t*)exeModule);
-            static SafetyHookMid HUDMateriaFXMidHook{};
-            HUDMateriaFXMidHook = safetyhook::create_mid(HUDMateriaFXScanResult,
-                [](SafetyHookContext& ctx) {
-                    if (fAspectRatio > fNativeAspect)
-                        ctx.xmm0.f32[0] = -1.00f / fAspectMultiplier;
-                });
-        }
-        else {
-            spdlog::error("HUD: Materia FX: Pattern scan failed.");
         }
 
         // HUD: Widgets
