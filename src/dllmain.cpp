@@ -293,7 +293,7 @@ void UpdateOffsets()
 
 void Resolution()
 {
-    // Grab desktop resolution/aspect just in case
+    // Grab desktop resolution
     DesktopDimensions = Util::GetPhysicalDesktopDimensions();
 
     // Replace 3840x2160 with custom resolution
@@ -429,11 +429,11 @@ void HUD()
         }
 
         // HUD: Map
-        std::uint8_t* HUDMapUpperScanResult = Memory::PatternScan(exeModule, "F3 0F ?? ?? ?? 49 8B ?? ?? ?? ?? ?? F3 44 ?? ?? ?? F3 44 ?? ?? ?? ?? F3 45 ?? ?? ?? 48 8B ??");
-        if (HUDMapUpperScanResult) {
-            spdlog::info("HUD: Map: Address is {:s}+{:x}", sExeName.c_str(), HUDMapUpperScanResult - (std::uint8_t*)exeModule);
-            static SafetyHookMid HUDMapUpperMidHook{};
-            HUDMapUpperMidHook = safetyhook::create_mid(HUDMapUpperScanResult,
+        std::uint8_t* HUDMapScanResult = Memory::PatternScan(exeModule, "F3 0F ?? ?? ?? 49 8B ?? ?? ?? ?? ?? F3 44 ?? ?? ?? F3 44 ?? ?? ?? ?? F3 45 ?? ?? ?? 48 8B ??");
+        if (HUDMapScanResult) {
+            spdlog::info("HUD: Map: Address is {:s}+{:x}", sExeName.c_str(), HUDMapScanResult - (std::uint8_t*)exeModule);
+            static SafetyHookMid HUDMapMidHook{};
+            HUDMapMidHook = safetyhook::create_mid(HUDMapScanResult,
                 [](SafetyHookContext& ctx) {
                     if (fAspectRatio != fNativeAspect) {
                         ctx.xmm0.f32[0] = fHUDScale;
@@ -498,11 +498,11 @@ void HUD()
             spdlog::info("HUD: Composite Layer: Address is {:s}+{:x}", sExeName.c_str(), HUDCompositeLayerScanResult - (std::uint8_t*)exeModule);
             static SafetyHookMid HUDCompositeLayerMidHook{};
             HUDCompositeLayerMidHook = safetyhook::create_mid(HUDCompositeLayerScanResult,
-                [](SafetyHookContext& ctx) {
-                    ctx.xmm3.f32[0] = fNativeAspect;
-
-                    if (fAspectRatio > fNativeAspect)
+                [](SafetyHookContext& ctx) {   
+                    if (fAspectRatio > fNativeAspect) {
+                        ctx.xmm3.f32[0] = fNativeAspect;
                         ctx.xmm0.f32[0] = 1.00f / fAspectMultiplier;
+                    }
                 });
         }
         else {
@@ -533,7 +533,7 @@ void HUD()
             static std::string objName;
             static std::string objOldName;
 
-            static SDK::UEndUserWidget* UMGColiseum = nullptr;
+            static SDK::UEndUserWidget* UMGMainMenuBase = nullptr;
             static SDK::UPause_00_C* UMGPause = nullptr;
             static SDK::UBattleTips_C* UMGBattleTips = nullptr;
             static SDK::UCom_Window_01_C* UMGComWindow = nullptr;
@@ -552,7 +552,15 @@ void HUD()
                         objName = obj->GetName();
 
                         // "MainMenu_Base_Test_C", main menu background
-                        if (objName.contains("MainMenu_Base_Test_C")) {
+                        if (objName.contains("MainMenu_Base_Test_C") && UMGMainMenuBase != obj) {
+                            #ifdef _DEBUG
+                            spdlog::info("HUD: Widgets: Main Menu Base: {}", objName);
+                            spdlog::info("HUD: Widgets: Main Menu Base: Address: {:x}", (uintptr_t)obj);
+                            #endif
+
+                            // Cache address
+                            UMGMainMenuBase = (SDK::UEndUserWidget*)obj;
+
                             if (fAspectRatio > fNativeAspect) {
                                 *reinterpret_cast<float*>(ctx.rcx + 0x1B0) = -(fHUDWidthOffset / fHUDWidth);
                                 *reinterpret_cast<float*>(ctx.rcx + 0x1B4) = 0.00f;
@@ -642,18 +650,6 @@ void HUD()
                                 else if (fAspectRatio < fNativeAspect)
                                     UMGBattleTips->Img_BlackFilter->SetRenderScale(SDK::FVector2D(1.00f, 1.00f / fAspectMultiplier));
                             }
-                        }
-
-                        // "Coliseum_Top_C", battle arena
-                        if (objName.contains("Coliseum_Top_C") && UMGColiseum != obj) {
-                            #ifdef _DEBUG
-                            spdlog::info("HUD: Widgets: Coliseum: {}", objName);
-                            spdlog::info("HUD: Widgets: Coliseum: Address: {:x}", (uintptr_t)obj);
-                            #endif
-
-                            UMGColiseum = (SDK::UEndUserWidget*)obj;
-
-                            // TODO
                         }
                     }
                 });
