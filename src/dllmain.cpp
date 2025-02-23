@@ -57,11 +57,11 @@ float fVignetteStrength;
 // Variables
 int iCurrentResX;
 int iCurrentResY;
-bool bMovieIsPlaying;
+int iScreenMode;
 int iRenderTargetX = 3840;
 int iRenderTargetY = 2160;
-int iScreenMode;
 bool bHUDNeedsResize;
+bool bMovieIsPlaying;
 
 void Logging()
 {
@@ -139,7 +139,7 @@ void Configuration()
     inipp::get_value(ini.sections["Vignette"], "Auto", bAutoVignette);
     inipp::get_value(ini.sections["Vignette"], "Strength", fVignetteStrength);
 
-    // Clamp settings to avoid breaking things
+    // Clamp settings
     fHUDResScale = std::clamp(fHUDResScale, 0.00f, 3.00f);
 
     // Log ini parse
@@ -205,7 +205,7 @@ void CalculateHUD(bool bLog)
     iRenderTargetX = static_cast<int>(iRenderTargetX * ResScale);
     iRenderTargetY = static_cast<int>(iRenderTargetY * ResScale);
 
-    // Don't allow resolution of render target to exceed 8192 on X/Y axis so that people don't kill performance and thrash VRAM
+    // Don't allow resolution of render target to exceed 16384 on either axis
     if (iRenderTargetX > MAX_RENDER_TARGET_SIZE || iRenderTargetY > MAX_RENDER_TARGET_SIZE) {
         float scaleFactorX = static_cast<float>(MAX_RENDER_TARGET_SIZE) / iRenderTargetX;
         float scaleFactorY = static_cast<float>(MAX_RENDER_TARGET_SIZE) / iRenderTargetY;
@@ -391,22 +391,22 @@ void HUD()
             spdlog::error("HUD: Render Target: Pattern scan failed.");
         }
 
-        // HUD: Constraints
-        std::uint8_t* HUDConstraintsScanResult = Memory::PatternScan(exeModule, "0F 10 ?? 0F 11 ?? 48 85 ?? 74 ?? 48 83 ?? ?? ?? ?? ?? 00 74 ??");
-        if (HUDConstraintsScanResult) {
-            spdlog::info("HUD: Constraints: Address is {:s}+{:x}", sExeName.c_str(), HUDConstraintsScanResult - (std::uint8_t*)exeModule);
-            static SafetyHookMid HUDConstraintsMidHook{};
-            HUDConstraintsMidHook = safetyhook::create_mid(HUDConstraintsScanResult,
+        // HUD: Clipping
+        std::uint8_t* HUDClippingScanResult = Memory::PatternScan(exeModule, "0F 10 ?? 0F 11 ?? 48 85 ?? 74 ?? 48 83 ?? ?? ?? ?? ?? 00 74 ??");
+        if (HUDClippingScanResult) {
+            spdlog::info("HUD: Clipping: Address is {:s}+{:x}", sExeName.c_str(), HUDClippingScanResult - (std::uint8_t*)exeModule);
+            static SafetyHookMid HUDClippingMidHook{};
+            HUDClippingMidHook = safetyhook::create_mid(HUDClippingScanResult,
                 [](SafetyHookContext& ctx) {
                     if (fAspectRatio != fNativeAspect) {
-                        // Set HUD constraints 
+                        // Set HUD clipping 
                         *reinterpret_cast<int*>(ctx.rax + 0x8) = iRenderTargetX;
                         *reinterpret_cast<int*>(ctx.rax + 0xC) = iRenderTargetY;
                     }
                 });
         }
         else {
-            spdlog::error("HUD: Constraints: Pattern scan failed.");
+            spdlog::error("HUD: Clipping: Pattern scan failed.");
         }
 
         // HUD: Size
@@ -435,9 +435,8 @@ void HUD()
             static SafetyHookMid HUDMapMidHook{};
             HUDMapMidHook = safetyhook::create_mid(HUDMapScanResult,
                 [](SafetyHookContext& ctx) {
-                    if (fAspectRatio != fNativeAspect) {
+                    if (fAspectRatio != fNativeAspect)
                         ctx.xmm0.f32[0] = fHUDScale;
-                    }
                 });
         }
         else {
@@ -529,9 +528,7 @@ void HUD()
         if (HUDWidgetsScanResult) {
             static SDK::UObject* obj = nullptr;
             static SDK::UObject* oldObj = nullptr;
-
             static std::string objName;
-            static std::string objOldName;
 
             static SDK::UEndUserWidget* UMGMainMenuBase = nullptr;
             static SDK::UPause_00_C* UMGPause = nullptr;
@@ -589,7 +586,7 @@ void HUD()
                             SDK::UEndCanvasPanelSlot* bg1Slot = (SDK::UEndCanvasPanelSlot*)UMGPause->Img_BG->Slot;
                             SDK::UEndCanvasPanelSlot* bg2Slot = (SDK::UEndCanvasPanelSlot*)UMGPause->Img_BG2->Slot;
 
-                            // Create offsets
+                            // Get offsets
                             SDK::FMargin bg1offsets = bg1Slot->GetOffsets();
                             SDK::FMargin bg2offsets = bg2Slot->GetOffsets();
 
@@ -643,7 +640,7 @@ void HUD()
                             // Cache address
                             UMGBattleTips = (SDK::UBattleTips_C*)obj;
 
-                            // Adjust background to span the screen
+                            // Stretch background to span the screen
                             if (UMGBattleTips->Img_BlackFilter) {
                                 if (fAspectRatio > fNativeAspect)
                                     UMGBattleTips->Img_BlackFilter->SetRenderScale(SDK::FVector2D(fAspectMultiplier, 1.00f));
