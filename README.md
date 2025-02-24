@@ -29,7 +29,6 @@ This is an ASI plugin for Final Fantasy VII Remake that adds ultrawide/narrower 
 Please report any issues you see. This list will contain bugs which may or may not be fixed.
 
 #### Ultrawide/Narrower
-- Combat simulator transition cutscene is displayed at the wrong aspect ratio.
 - Map menu has a blue tint when at <16:9.
 
 ## Recommended Mods
