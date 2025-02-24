@@ -40,6 +40,7 @@ Please report any issues you see. This list will contain bugs which may or may n
 | Gameplay |
 
 ## Credits
+[Flawless Widescreen](http://www.flawlesswidescreen.org/) for the green glow bug fix. You can support the creator of that software [here](https://ko-fi.com/flawlesswidescreen).<br />
 [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) for ASI loading. <br />
 [inipp](https://github.com/mcmtroffaes/inipp) for ini reading. <br />
 [spdlog](https://github.com/gabime/spdlog) for logging. <br />
