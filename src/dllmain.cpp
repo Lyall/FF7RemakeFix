@@ -62,6 +62,7 @@ int iRenderTargetX = 3840;
 int iRenderTargetY = 2160;
 bool bHUDNeedsResize;
 bool bMovieIsPlaying;
+bool bIsVRAnim;
 
 void Logging()
 {
@@ -358,7 +359,7 @@ void AspectRatioFOV()
             AspectRatioMidHook = safetyhook::create_mid(AspectRatioFOVScanResult + 0xB,
                 [](SafetyHookContext& ctx) {
                     // Apply corrected aspect ratio unless a movie is playing
-                    if (!bMovieIsPlaying && fAspectRatio != fNativeAspect)
+                    if (fAspectRatio != fNativeAspect)
                         ctx.rax = *(uint32_t*)&fAspectRatio;
                 });
         }
@@ -380,9 +381,8 @@ void HUD()
                 [](SafetyHookContext& ctx) {
                     if (fAspectRatio != fNativeAspect) {
                         // Calculate new HUD size if resolution changed
-                        if (bHUDNeedsResize) {
+                        if (bHUDNeedsResize)
                             CalculateHUD(true);
-                        }
 
                         // Set render target dimensions 
                         *reinterpret_cast<int*>(ctx.rdi + 0x240) = iRenderTargetX;
@@ -455,12 +455,27 @@ void HUD()
                 [](SafetyHookContext& ctx) {
                     bMovieIsPlaying = ((ctx.rflags & (1ULL << 6)) == 0);
 
-                    // Resize viewport when using borderless as adjusting the aspect ratio does not
-                    if (bMovieIsPlaying && ctx.rdi && iScreenMode == 1) {
-                        if (fAspectRatio > fNativeAspect)
-                            *reinterpret_cast<int*>(ctx.rdi + 0x88) = (int)ceilf(iCurrentResY * fNativeAspect);
-                        else if (fAspectRatio < fNativeAspect)
-                            *reinterpret_cast<int*>(ctx.rdi + 0x8C) = (int)ceilf(iCurrentResX / fNativeAspect);
+                    if (bMovieIsPlaying && ctx.rdi) {
+                        // Resize viewport for borderless
+                        if (iScreenMode == 1) {
+                            if (fAspectRatio > fNativeAspect)
+                                *reinterpret_cast<int*>(ctx.rdi + 0x88) = (int)ceilf(iCurrentResY * fNativeAspect);
+                            else if (fAspectRatio < fNativeAspect)
+                                *reinterpret_cast<int*>(ctx.rdi + 0x8C) = (int)ceilf(iCurrentResX / fNativeAspect);
+                        } 
+                        else {
+                            // Resize viewport for windowed/fullscreen
+                            if (fAspectRatio > fNativeAspect) {
+                                float WidthOffset = ((float)iCurrentResX - (iCurrentResY * fNativeAspect)) / 2.00f;
+                                *reinterpret_cast<int*>(ctx.rdi + 0x80) = (int)ceilf(WidthOffset);
+                                *reinterpret_cast<int*>(ctx.rdi + 0x88) = iCurrentResX - (int)ceilf(WidthOffset);
+                            }
+                            else if (fAspectRatio < fNativeAspect) {
+                                float HeightOffset = ((float)iCurrentResY - (iCurrentResX / fNativeAspect)) / 2.00f;
+                                *reinterpret_cast<int*>(ctx.rdi + 0x84) = (int)ceilf(HeightOffset);
+                                *reinterpret_cast<int*>(ctx.rdi + 0x8C) = iCurrentResY - (int)ceilf(HeightOffset);
+                            }                  
+                        } 
                     }
                 });
         }
@@ -492,19 +507,59 @@ void HUD()
             spdlog::error("HUD: Fades: Pattern scan failed.");
         }
 
+        // HUD: VR battle
+        std::uint8_t* HUDVRLevelLoadScanResult = Memory::PatternScan(exeModule, "33 ?? 48 ?? ?? 74 ?? 48 8B ?? ?? ?? ?? ?? 48 85 ?? 74 ?? 48 63 ?? ?? ?? ?? ?? 85 C0 7E ??");
+        if (HUDVRLevelLoadScanResult) {
+            static SDK::UObject* oldLevelOuter;
+
+            spdlog::info("HUD: VR Level Load: Address is {:s}+{:x}", sExeName.c_str(), HUDVRLevelLoadScanResult - (std::uint8_t*)exeModule);
+            static SafetyHookMid HUDVRLevelLoadMidHook{};
+            HUDVRLevelLoadMidHook = safetyhook::create_mid(HUDVRLevelLoadScanResult + 0x7,
+                [](SafetyHookContext& ctx) {
+                    // Get current level
+                    SDK::ULevel* Level = (SDK::ULevel*)ctx.rbx;
+
+                    // Check if level has changed
+                    if (Level->Outer != oldLevelOuter) {
+                        // Cache level object
+                        oldLevelOuter = Level->Outer;
+
+                        // Get name of level package
+                        std::string sLevelName = Level->Outer->GetName();
+
+                        // Check if it is the VR battle transitional animation
+                        if (sLevelName.contains("VRBattle_Animation"))
+                            bIsVRAnim = true;
+                        else
+                            bIsVRAnim = false;
+                    }
+                });
+        }
+        else {
+            spdlog::error("HUD: VR Level Load: Pattern scan failed.");
+        }
+
         // HUD: Composite layer
         std::uint8_t* HUDCompositeLayerScanResult = Memory::PatternScan(exeModule, "0F 11 ?? ?? ?? ?? ?? C7 ?? ?? 00 00 00 00 48 ?? ?? ?? 00 00 00 00 0F 28 ??");
         if (HUDCompositeLayerScanResult) {
             spdlog::info("HUD: Composite Layer: Address is {:s}+{:x}", sExeName.c_str(), HUDCompositeLayerScanResult - (std::uint8_t*)exeModule);
             static SafetyHookMid HUDCompositeLayerMidHook{};
             HUDCompositeLayerMidHook = safetyhook::create_mid(HUDCompositeLayerScanResult,
-                [](SafetyHookContext& ctx) {   
-                    if (fAspectRatio > fNativeAspect) {
-                        ctx.xmm0.f32[0] = 1.00f / fAspectMultiplier;
-                        ctx.xmm3.f32[0] = fNativeAspect / fAspectMultiplier;
+                [](SafetyHookContext& ctx) { 
+                    if (bIsVRAnim) {
+                        if (fAspectRatio > fNativeAspect) {
+                            ctx.xmm0.f32[0] = 1.00f / fAspectMultiplier;
+                            ctx.xmm3.f32[0] = fNativeAspect;
+                        }
                     }
-                    else if (fAspectRatio < fNativeAspect) {
-                        ctx.xmm0.f32[0] = fAspectRatio / fNativeAspect;
+                    else {
+                        if (fAspectRatio > fNativeAspect) {
+                            ctx.xmm0.f32[0] = 1.00f / fAspectMultiplier;
+                            ctx.xmm3.f32[0] = fNativeAspect / fAspectMultiplier;
+                        }
+                        else if (fAspectRatio < fNativeAspect) {
+                            ctx.xmm0.f32[0] = fAspectRatio / fNativeAspect;
+                        }
                     }
                 });
         }
@@ -585,8 +640,7 @@ void HUD()
                                 bg2offsets.RIGHT = 1080.00f * fAspectRatio;
                             }
                             else if (fAspectRatio < fNativeAspect) {
-                                bg1offsets.Bottom = 1920.00f / fAspectRatio;
-                                bg2offsets.Bottom = 1920.00f / fAspectRatio;
+                                // TODO
                             }
 
                             // Set adjusted offsets
@@ -667,6 +721,17 @@ void Graphics()
         else {
             spdlog::error("Post Processing: Pattern scan failed.");
         }
+    }
+
+    // GreenFixV2, from lolhax's FWS script for FFVII Remake
+    std::uint8_t* GreenFixScanResult = Memory::PatternScan(exeModule, "BE 40 00 00 00 F3 0F ?? ?? ?? ?? ?? ?? F3 0F ?? ?? 0F ?? ?? 73 ?? F3 0F ?? ?? ?? ?? ?? ??");
+    if (GreenFixScanResult) {
+        spdlog::info("GreenFix: Address is {:s}+{:x}", sExeName.c_str(), GreenFixScanResult - (std::uint8_t*)exeModule);
+        Memory::Write(GreenFixScanResult + 0x1, (int)96);
+        spdlog::info("GreenFix: Patched instruction.");
+    }
+    else {
+        spdlog::error("GreenFix: Pattern scan failed.");
     }
 
     spdlog::info("----------");
