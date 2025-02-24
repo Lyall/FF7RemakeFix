@@ -483,12 +483,14 @@ void HUD()
                     if (fMovieStartTime < fTransitionDuration) {
                         // Begin transition
                         fMovieStartTime = std::min(fMovieStartTime + fElapsed, fTransitionDuration);
-                        float fLerpFactor = fMovieStartTime / fTransitionDuration;
+
+                        // Apply easing 
+                        float fTime = fMovieStartTime / fTransitionDuration;
+                        float fLerpFactor = fTime < 0.50f ? 2.00f * fTime * fTime : 1.00f - std::pow(-2.00f * fTime + 2.00f, 2.00f) / 2.00f;
 
                         // Reverse the transition if a movie has stopped playing
-                        if (!bMovieIsPlaying) {
+                        if (!bMovieIsPlaying)
                             fLerpFactor = 1.0f - fLerpFactor;
-                        }
 
                         if (bIsBorderless) {
                             // Interp viewport size for borderless mode
