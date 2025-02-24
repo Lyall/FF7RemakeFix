@@ -499,8 +499,9 @@ void HUD()
                             // Interp viewport size for windowed/fullscreen mode
                             int& iCurrentOffset = bIsWide ? *(int*)(ctx.rdi + 0x80) : *(int*)(ctx.rdi + 0x84);
                             int& iCurrentXY = bIsWide ? *(int*)(ctx.rdi + 0x88) : *(int*)(ctx.rdi + 0x8C);
+
                             iCurrentOffset = static_cast<int>(iCurrentOffset + (iTargetOffset - iCurrentOffset) * fLerpFactor);
-                            iCurrentXY = static_cast<int>(iCurrentXY + (iTargetXY - iCurrentXY) * fLerpFactor);
+                            iCurrentXY = static_cast<int>(iCurrentXY + ((iTargetXY + iTargetOffset) - iCurrentXY) * fLerpFactor);
                         }
                     }
                     else if (bMovieIsPlaying) {
