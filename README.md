@@ -28,9 +28,6 @@ This is an ASI plugin for Final Fantasy VII Remake that adds ultrawide/narrower 
 ## Known Issues
 Please report any issues you see. This list will contain bugs which may or may not be fixed.
 
-#### Ultrawide/Narrower
-- Map menu has a blue tint when at <16:9.
-
 ## Recommended Mods
 - [FFVIIHook](https://www.nexusmods.com/finalfantasy7remake/mods/74) by [emoose](https://github.com/emoose) - Unlocks the console, allows overriding certain cvars and more.
 
