@@ -724,7 +724,7 @@ void Graphics()
         }
     }
 
-    // GreenFixV2, from lolhax's FWS script for FFVII Remake
+    // GreenFixV2 - This is from HaYDeN's Flawless Widescreen script for FFVII Remake.
     std::uint8_t* GreenFixScanResult = Memory::PatternScan(exeModule, "BE 40 00 00 00 F3 0F ?? ?? ?? ?? ?? ?? F3 0F ?? ?? 0F ?? ?? 73 ?? F3 0F ?? ?? ?? ?? ?? ??");
     if (GreenFixScanResult) {
         spdlog::info("GreenFix: Address is {:s}+{:x}", sExeName.c_str(), GreenFixScanResult - (std::uint8_t*)exeModule);
