@@ -640,7 +640,8 @@ void HUD()
                                 bg2offsets.RIGHT = 1080.00f * fAspectRatio;
                             }
                             else if (fAspectRatio < fNativeAspect) {
-                                // TODO
+                                bg1offsets.Bottom = 1920.00f / fAspectRatio;
+                                bg2offsets.Top = 560.00f / fAspectMultiplier;
                             }
 
                             // Set adjusted offsets
