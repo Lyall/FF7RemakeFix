@@ -491,14 +491,14 @@ void HUD()
             HUDFadesMidHook = safetyhook::create_mid(HUDFadesScanResult,
                 [](SafetyHookContext& ctx) {
                     // This is a bit jank
-                    if (ctx.rcx && ctx.xmm0.f32[0] >= 1919.00f && ctx.xmm0.f32[0] <= 1921.00f) {
+                    if (ctx.rcx && ctx.xmm0.f32[0] > 1919.00f && ctx.xmm0.f32[0] < 1921.00f) {
                         if (fAspectRatio > fNativeAspect) {
                             *reinterpret_cast<float*>(ctx.rcx + 0x10) = 0.00f;
-                            ctx.xmm0.f32[0] = ctx.xmm0.f32[1] * fAspectRatio;
+                            ctx.xmm0.f32[0] *= fAspectMultiplier;
                         }
                         else if (fAspectRatio < fNativeAspect) {
                             *reinterpret_cast<float*>(ctx.rcx + 0x14) = 0.00f;
-                            ctx.xmm0.f32[1] = ctx.xmm0.f32[0] / fAspectRatio;
+                            ctx.xmm0.f32[1] /= fAspectMultiplier;
                         }
                     }
                 });
