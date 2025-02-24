@@ -707,7 +707,7 @@ void Graphics()
         // Post processing 
         std::uint8_t* PostProcessingScanResult = Memory::PatternScan(exeModule, "89 ?? ?? ?? ?? ?? 83 ?? ?? ?? ?? ?? FE 48 8B ?? ?? ?? 48 83 ?? ?? 5F C3");
         if (PostProcessingScanResult) {
-            spdlog::info("Post Processing: Address is {:s}+{:x}", sExeName.c_str(), PostProcessingScanResult - (std::uint8_t*)exeModule);
+            spdlog::info("Graphics: Post Processing: Address is {:s}+{:x}", sExeName.c_str(), PostProcessingScanResult - (std::uint8_t*)exeModule);
             static SafetyHookMid PostProcessingMidHook{};
             PostProcessingMidHook = safetyhook::create_mid(PostProcessingScanResult + 0xD,
                 [](SafetyHookContext& ctx) {
@@ -720,19 +720,59 @@ void Graphics()
                 });
         }
         else {
-            spdlog::error("Post Processing: Pattern scan failed.");
+            spdlog::error("Graphics: Post Processing: Pattern scan failed.");
         }
     }
 
     // GreenFixV2 - This is from HaYDeN's Flawless Widescreen script for FFVII Remake.
     std::uint8_t* GreenFixScanResult = Memory::PatternScan(exeModule, "BE 40 00 00 00 F3 0F ?? ?? ?? ?? ?? ?? F3 0F ?? ?? 0F ?? ?? 73 ?? F3 0F ?? ?? ?? ?? ?? ??");
     if (GreenFixScanResult) {
-        spdlog::info("GreenFix: Address is {:s}+{:x}", sExeName.c_str(), GreenFixScanResult - (std::uint8_t*)exeModule);
+        spdlog::info("Graphics: GreenFix: Address is {:s}+{:x}", sExeName.c_str(), GreenFixScanResult - (std::uint8_t*)exeModule);
         Memory::Write(GreenFixScanResult + 0x1, (int)96);
-        spdlog::info("GreenFix: Patched instruction.");
+        spdlog::info("Graphics: GreenFix: Patched instruction.");
     }
     else {
-        spdlog::error("GreenFix: Pattern scan failed.");
+        spdlog::error("Graphics: GreenFix: Pattern scan failed.");
+    }
+
+    // Increase camera distance limits
+    std::uint8_t* OptionsMenuScanResult = Memory::PatternScan(exeModule, "48 8B ?? ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B ?? 48 85 ?? 74 ?? 48 8B ?? 49 8B ?? E8 ?? ?? ?? ?? 84 ?? 74 ??");
+    if (OptionsMenuScanResult) {
+        spdlog::info("Options Menu: Address is {:s}+{:x}", sExeName.c_str(), OptionsMenuScanResult - (std::uint8_t*)exeModule);
+        static SafetyHookMid OptionsMenuMidHook{};
+        OptionsMenuMidHook = safetyhook::create_mid(OptionsMenuScanResult,
+            [](SafetyHookContext& ctx) {
+                SDK::UObject* obj = (SDK::UObject*)ctx.rcx;
+
+                if (obj->IsA(SDK::UEndNewOptionsMenu::StaticClass())) {
+                    auto* optionsMenu = (SDK::UEndNewOptionsMenu*)obj;
+                    auto options = optionsMenu->_OptionItems;
+
+                    // Iterate over options
+                    for (UC::TPair<SDK::EMenuItemCategory, SDK::FOptionInfos>& option : options) {
+                        // Find camera options
+                        if (option.Key() == SDK::EMenuItemCategory::CameraController) {
+                            // Get option infos
+                            auto& optionInfos = option.Value().Infos;
+                            // Check if options are valid
+                            if (optionInfos.IsValidIndex(0) && optionInfos.IsValidIndex(1)) {
+                                // Check if max value is unmodified
+                                if (optionInfos[0].RangeInfo.MaxValue == 3) {
+                                    // Index 0 is Camera Distance: Out of Battle
+                                    optionInfos[0].RangeInfo.MaxValue = 10;
+                                    optionInfos[0].RangeInfo.MinValue = -2;
+                                    // Index 1 is Camera Distance: In Battle
+                                    optionInfos[1].RangeInfo.MaxValue = 10;
+                                    optionInfos[1].RangeInfo.MinValue = -2;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+    }
+    else {
+        spdlog::error("Options Menu: Pattern scan failed.");
     }
 
     spdlog::info("----------");
