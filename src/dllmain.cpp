@@ -449,33 +449,75 @@ void HUD()
         // HUD: Movies
         std::uint8_t* MovieViewportScanResult = Memory::PatternScan(exeModule, "0F ?? ?? ?? ?? ?? ?? B8 ?? ?? ?? ?? BA ?? ?? ?? ?? 41 ?? ?? 0F ?? ?? 41 ?? ??");
         if (MovieViewportScanResult) {
+            static bool bPrevMovieState = false;
+            static float fMovieStartTime = 0.0f;
+            static const float fTransitionDuration = 1.0f;
+            static auto tLastUpdate = std::chrono::steady_clock::now();
+
             spdlog::info("HUD: Movies: Address is {:s}+{:x}", sExeName.c_str(), MovieViewportScanResult - (std::uint8_t*)exeModule);
             static SafetyHookMid MovieViewportMidHook{};
             MovieViewportMidHook = safetyhook::create_mid(MovieViewportScanResult + 0x7,
                 [](SafetyHookContext& ctx) {
                     bMovieIsPlaying = ((ctx.rflags & (1ULL << 6)) == 0);
 
-                    if (bMovieIsPlaying && ctx.rdi) {
-                        // Resize viewport for borderless
-                        if (iScreenMode == 1) {
-                            if (fAspectRatio > fNativeAspect)
-                                *reinterpret_cast<int*>(ctx.rdi + 0x88) = (int)ceilf(iCurrentResY * fNativeAspect);
-                            else if (fAspectRatio < fNativeAspect)
-                                *reinterpret_cast<int*>(ctx.rdi + 0x8C) = (int)ceilf(iCurrentResX / fNativeAspect);
-                        } 
+                    // Calculate elapsed time
+                    auto tNow = std::chrono::steady_clock::now();
+                    float fElapsed = std::chrono::duration<float>(tNow - tLastUpdate).count();
+                    tLastUpdate = tNow;
+
+                    // Check if the movie state has changed
+                    if (bMovieIsPlaying != bPrevMovieState) {
+                        fMovieStartTime = 0.0f; // Reset transition timer
+                        bPrevMovieState = bMovieIsPlaying; // Set previous movie state
+                    }
+
+                    bool bIsWide = (fAspectRatio > fNativeAspect);
+                    bool bIsBorderless = (iScreenMode == 1);
+
+                    // Calculate target viewport size
+                    int iTargetXY = bIsWide ? (int)ceilf(iCurrentResY * fNativeAspect) : (int)ceilf(iCurrentResX / fNativeAspect);
+                    float fOffset = bIsWide ? (iCurrentResX - iCurrentResY * fNativeAspect) / 2.0f : (iCurrentResY - iCurrentResX / fNativeAspect) / 2.0f;
+                    int iTargetOffset = static_cast<int>(ceilf(fOffset));
+
+                    // If transition is active interp the viewport, otherwise set it statically
+                    if (fMovieStartTime < fTransitionDuration) {
+                        // Begin transition
+                        fMovieStartTime = std::min(fMovieStartTime + fElapsed, fTransitionDuration);
+                        float fLerpFactor = fMovieStartTime / fTransitionDuration;
+
+                        // Reverse the transition if a movie has stopped playing
+                        if (!bMovieIsPlaying) {
+                            fLerpFactor = 1.0f - fLerpFactor;
+                        }
+
+                        if (bIsBorderless) {
+                            // Interp viewport size for borderless mode
+                            int& iCurrentXY = bIsWide ? *(int*)(ctx.rdi + 0x88) : *(int*)(ctx.rdi + 0x8C);
+                            iCurrentXY = static_cast<int>(iCurrentXY + (iTargetXY - iCurrentXY) * fLerpFactor);
+                        }
                         else {
-                            // Resize viewport for windowed/fullscreen
-                            if (fAspectRatio > fNativeAspect) {
-                                float WidthOffset = ((float)iCurrentResX - (iCurrentResY * fNativeAspect)) / 2.00f;
-                                *reinterpret_cast<int*>(ctx.rdi + 0x80) = (int)ceilf(WidthOffset);
-                                *reinterpret_cast<int*>(ctx.rdi + 0x88) = iCurrentResX - (int)ceilf(WidthOffset);
-                            }
-                            else if (fAspectRatio < fNativeAspect) {
-                                float HeightOffset = ((float)iCurrentResY - (iCurrentResX / fNativeAspect)) / 2.00f;
-                                *reinterpret_cast<int*>(ctx.rdi + 0x84) = (int)ceilf(HeightOffset);
-                                *reinterpret_cast<int*>(ctx.rdi + 0x8C) = iCurrentResY - (int)ceilf(HeightOffset);
-                            }                  
-                        } 
+                            // Interp viewport size for windowed/fullscreen mode
+                            int& iCurrentOffset = bIsWide ? *(int*)(ctx.rdi + 0x80) : *(int*)(ctx.rdi + 0x84);
+                            int& iCurrentXY = bIsWide ? *(int*)(ctx.rdi + 0x88) : *(int*)(ctx.rdi + 0x8C);
+
+                            iCurrentOffset = static_cast<int>(iCurrentOffset + (iTargetOffset - iCurrentOffset) * fLerpFactor);
+                            iCurrentXY = static_cast<int>(iCurrentXY + (iTargetXY - iCurrentXY) * fLerpFactor);
+                        }
+                    }
+                    else if (bMovieIsPlaying) {
+                        if (bIsBorderless) {
+                            // Set static viewport size for borderless mode
+                            int& iCurrentXY = bIsWide ? *(int*)(ctx.rdi + 0x88) : *(int*)(ctx.rdi + 0x8C);
+                            iCurrentXY = iTargetXY;
+                        }
+                        else {
+                            // Set static viewport size for windowed/fullscreen mode
+                            int& iCurrentOffset = bIsWide ? *(int*)(ctx.rdi + 0x80) : *(int*)(ctx.rdi + 0x84);
+                            int& iCurrentXY = bIsWide ? *(int*)(ctx.rdi + 0x88) : *(int*)(ctx.rdi + 0x8C);
+
+                            iCurrentOffset = iTargetOffset;
+                            iCurrentXY = iTargetXY;
+                        }
                     }
                 });
         }
