@@ -28,6 +28,8 @@ This is an ASI plugin for Final Fantasy VII Remake that adds ultrawide/narrower 
 ## Known Issues
 Please report any issues you see. This list will contain bugs which may or may not be fixed.
 
+- Combat simulator transition animation is displayed at the wrong aspect ratio.
+
 ## Recommended Mods
 - [FFVIIHook](https://www.nexusmods.com/finalfantasy7remake/mods/74) by [emoose](https://github.com/emoose) - Unlocks the console, allows overriding certain cvars and more.
 
