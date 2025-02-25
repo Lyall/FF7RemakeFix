@@ -8,9 +8,10 @@ This is an ASI plugin for Final Fantasy VII Remake that adds ultrawide/narrower 
 ### General
 - Support for custom resolutions.
 - Disable/adjust vignette.
+- Increase camera distance limits.
 
 ### Ultrawide/Narrower
-- Corrected aspect ratio and FOV.
+- Support any aspect ratio with correct FOV.
 - Centered 16:9 HUD.
 
 ## Installation
